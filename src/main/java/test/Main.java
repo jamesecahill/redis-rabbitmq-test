@@ -7,12 +7,25 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+
 import redis.clients.jedis.Jedis;
 
 public class Main {
     public static final String QUEUE = "work";
+
+    // counts
     private static final int WORKER_COUNT = 20;
     private static final int MANAGER_COUNT = 2;
+
+    // intervals
+    public static final long GROOM_INTERVAL = 500;
+    public static final int MAX_WORKER_WAIT = 50;
+    public static final int MIN_WORKER_WAIT = 5;
+    public static final double WORKER_FAILURE_PERCENT = 0.05;
+    public static final long MANAGER_SEND_INTERVAL = 20;
+
     public static AtomicLong messageCounts = new AtomicLong(1);
 
     private Main() {
@@ -25,23 +38,26 @@ public class Main {
         jedis.close();
 
         ExecutorService svc = Executors.newFixedThreadPool(WORKER_COUNT + MANAGER_COUNT + 1);
+        ConnectionFactory factory = new ConnectionFactory();
+        factory.setHost("localhost");
+        Connection connection = factory.newConnection();
 
         // start managers
         Manager[] mgrs = new Manager[MANAGER_COUNT];
-        for (int i=0; i<MANAGER_COUNT; i++) {
-            mgrs[i] = new Manager();
+        for (int i = 0; i < MANAGER_COUNT; i++) {
+            mgrs[i] = new Manager(connection);
             svc.execute(mgrs[i]);
         }
 
         // start a couple workers
         Worker[] workers = new Worker[WORKER_COUNT];
-        for (int i=0; i<WORKER_COUNT; i++) {
-            workers[i] = new Worker();
+        for (int i = 0; i < WORKER_COUNT; i++) {
+            workers[i] = new Worker(connection);
             svc.execute(workers[i]);
         }
 
         // start a groomer
-        Groomer groomer = new Groomer(svc, workers);
+        Groomer groomer = new Groomer(svc, workers, connection);
         svc.execute(groomer);
 
         System.out.println("x to exit, o to start, f to stop, g to groom");
@@ -72,10 +88,10 @@ public class Main {
             m.stop();
         }
 
-        //shutdown groomer
+        // shutdown groomer
         groomer.stop();
 
-        //peace out
+        // peace out
         System.exit(0);
     }
 }
