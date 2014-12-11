@@ -7,10 +7,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.redisson.Redisson;
+
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
-
-import redis.clients.jedis.Jedis;
 
 public class Main {
     public static final String QUEUE = "work";
@@ -25,17 +25,18 @@ public class Main {
     public static final int MIN_WORKER_WAIT = 5;
     public static final double WORKER_FAILURE_PERCENT = 0.05;
     public static final long MANAGER_SEND_INTERVAL = 20;
+    public static final double MANAGER_FAILURE_PERCENT = 0.05;
 
     public static AtomicLong messageCounts = new AtomicLong(1);
+    // this is thread-safe
+    public static Redisson redisson;
 
     private Main() {
         throw new RuntimeException();
     }
 
     public static void main(String... args) throws IOException {
-        Jedis jedis = new Jedis("localhost");
-        jedis.setex("ts", 1, String.valueOf(System.currentTimeMillis()));
-        jedis.close();
+        redisson = Redisson.create();
 
         ExecutorService svc = Executors.newFixedThreadPool(WORKER_COUNT + MANAGER_COUNT + 1);
         ConnectionFactory factory = new ConnectionFactory();
@@ -90,6 +91,9 @@ public class Main {
 
         // shutdown groomer
         groomer.stop();
+
+        // shutdown redisson
+        redisson.shutdown();
 
         // peace out
         System.exit(0);
