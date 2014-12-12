@@ -1,6 +1,6 @@
 # Redis RabitMQ Test
 
-Simple project to test out multi-threaded manager/worker patterns with rabbit mq. Also a jedis test.
+Simple project to test out multi-threaded manager/worker patterns with rabbit mq and distributed redisson locks in redis.
 
 ### Prereqs
 1. gradle
